@@ -1,0 +1,686 @@
+ <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>INVERSIONES M&R</title>
+    <link rel="icon" href="img/logo.ico" type="image/x-icon">
+    <link rel="icon" type="image/png" href="img/logo.png">
+    <link rel="apple-touch-icon" href="img/logo.png">
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <!-- Pantalla de Carga Inicial Sólida -->
+    <div id="initial-loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #1f2c44; z-index: 20000; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <img src="img/logo.png" alt="Logo" style="width: 100px; height: auto; margin-bottom: 20px; border-radius: 15px;">
+        <div class="spinner" style="border: 4px solid rgba(255, 255, 255, 0.3); width: 40px; height: 40px; border-radius: 50%; border-left-color: #ffffff; animation: spin 1s linear infinite;"></div>
+        <h3 style="margin-top: 20px; color: #ffffff; font-family: sans-serif;">Cargando sistema...</h3>
+        <style>
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+    </div>
+
+    <div class="container">
+        <img src="img/logo.png" alt="Logo" style="width: 100px; height: auto; border: 2px solid black; border-radius: 15px; margin-bottom: 15px;">
+        <h2>Iniciar Sesión</h2>
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="password" id="password" placeholder="Contraseña">
+        <div style="text-align: left; margin: 10px 0;">
+            <label style="display: inline-flex; align-items: center; font-weight: normal; font-size: 14px;">
+                <input type="checkbox" id="remember-me" style="margin-right: 8px;"> Recordar datos
+            </label>
+        </div>
+        <button id="btnLogin">Entrar</button>
+        <div id="login-message" style="margin-top: 10px;"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="funciones.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnLogin = document.getElementById('btnLogin');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const rememberCheckbox = document.getElementById('remember-me');
+            const messageDiv = document.getElementById('login-message');
+
+            // Cargar datos guardados si existen
+            if (localStorage.getItem('savedEmail') && localStorage.getItem('savedPassword')) {
+                emailInput.value = localStorage.getItem('savedEmail');
+                passwordInput.value = localStorage.getItem('savedPassword');
+                rememberCheckbox.checked = true;
+            }
+
+            btnLogin.addEventListener('click', async () => {
+                const email = emailInput.value;
+                const password = passwordInput.value;
+
+                if (rememberCheckbox.checked) {
+                    localStorage.setItem('savedEmail', email);
+                    localStorage.setItem('savedPassword', password);
+                } else {
+                    localStorage.removeItem('savedEmail');
+                    localStorage.removeItem('savedPassword');
+                }
+
+                const result = await window.signInWithSupabase(email, password);
+                messageDiv.textContent = result.message;
+
+                if (result.showHome) {
+                    window.showHomeScreen();
+                }
+            });
+        });
+    </script>
+
+    <!-- Home Screen (Hidden by default) -->
+    <div id="home" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="logout()">&#8592;</button>
+        </div>
+        <div style="padding: 20px; display: flex; flex-direction: column; align-items: center; flex: 1; justify-content: center;">
+            <img src="img/logo.png" alt="Logo" style="width: 120px; height: auto; margin-bottom: 10px;">
+            <h1 id="home-welcome-msg" style="font-size: 19px; margin-top: 0;">Bienvenido</h1>
+            <button class="menu-btn" onclick="showRegisterClientScreen()">REGISTRAR CLIENTE</button>
+            <button class="menu-btn" onclick="showCreditScreen()">CREDITO</button>
+            <button class="menu-btn" onclick="showDebtorsScreen()">VER DEUDORES</button>
+            <button class="menu-btn" onclick="openGastosTypeModal()">GASTOS</button>
+            <button class="menu-btn" onclick="openReportesTypeModal()">CIERRES</button>
+            <button id="btn-inversiones" class="menu-btn hidden" onclick="handleConnectionButton('ADMIN M&R')">ADMIN M&R</button>
+            <button id="btn-database" class="menu-btn hidden" onclick="handleConnectionButton('Base de datos')">BASE DE DATOS</button>
+            <button class="menu-btn" onclick="logout()">CERRAR SESION</button>
+        </div>
+    </div>
+
+    <!-- Pantalla Registrar Cliente -->
+    <div id="registrar-cliente-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">REGISTRAR CLIENTE</span>
+            <img src="img/logo.png" class="top-bar-logo" alt="Logo">
+        </div>
+        <div class="form-content">
+            <label>NOMBRE DEL CLIENTE</label>
+            <input type="text" id="client-name" placeholder="Nombre completo">
+
+            <label>CEDULA</label>
+            <input type="number" id="client-cedula" placeholder="Número de documento" inputmode="numeric">
+
+            <label>DIRECCION</label>
+            <input type="text" id="client-address" placeholder="Dirección de residencia">
+
+            <label>TELEFONO</label>
+            <input type="tel" id="client-phone" placeholder="Número de contacto">
+
+            <label>TIPO DE PAGO</label>
+            <select id="payment-select">
+                <option value="" disabled selected>Seleccione tipo de pago</option>
+                <option value="Diario">Diario</option>
+                <option value="Semanal">Semanal</option>
+            </select>
+
+            <!-- Campos exclusivos para Admin/Dev (Departamento) -->
+            <div id="admin-field-dept" class="hidden">
+                <label>DEPARTAMENTO</label>
+                <select id="department-select">
+                    <option value="" disabled selected>Seleccione un departamento</option>
+                </select>
+            </div>
+
+            <label>MUNICIPIO</label>
+            <select id="municipality-select">
+                <option value="" disabled selected>Seleccione un municipio</option>
+            </select>
+
+            <!-- Campos exclusivos para Admin/Dev (Asesor) -->
+            <div id="admin-field-asesor" class="hidden">
+                <label>ASESOR ASIGNADO</label>
+                <select id="asesor-select">
+                    <option value="" disabled selected>Seleccione un asesor</option>
+                </select>
+            </div>
+
+            <button id="btn-register-client" onclick="registerClient()">REGISTRAR CLIENTE</button>
+        </div>
+    </div>
+
+    <!-- Pantalla Crédito -->
+    <div id="credito-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">CREDITO</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content">
+            <label>CLIENTE</label>
+            <input type="text" id="credit-client" placeholder="Nombre del cliente" readonly>
+
+            <label>CEDULA</label>
+            <input type="number" id="credit-cedula" placeholder="Cédula" readonly>
+
+            <label>TELEFONO</label>
+            <input type="tel" id="credit-phone" placeholder="Teléfono" readonly>
+
+            <label>DIRECCION</label>
+            <input type="text" id="credit-address" placeholder="Dirección" readonly>
+
+            <!-- Campos exclusivos para Admin/Dev (Departamento) -->
+            <div id="credit-admin-field-dept" class="hidden">
+                <label>DEPARTAMENTO</label>
+                <select id="credit-department-select">
+                    <option value="" disabled selected>Seleccione un departamento</option>
+                </select>
+            </div>
+
+            <label>MUNICIPIO</label>
+            <input type="text" id="credit-municipality" placeholder="Municipio" readonly>
+            <select id="credit-municipality-select" class="hidden">
+                <option value="" disabled selected>Seleccione un municipio</option>
+            </select>
+
+            <!-- Campos exclusivos para Admin/Dev (Asesor) -->
+            <div id="credit-admin-field-asesor" class="hidden">
+                <label>ASESOR ASIGNADO</label>
+                <select id="credit-asesor-select">
+                    <option value="" disabled selected>Seleccione un asesor</option>
+                </select>
+            </div>
+
+            <label>FECHA</label>
+            <input type="text" id="credit-date" readonly>
+
+            <label>TIPO DE PAGO</label>
+            <input type="text" id="credit-payment-type" placeholder="Tipo de pago" readonly>
+            <select id="credit-payment-select" class="hidden">
+                <option value="Diario">Diario</option>
+                <option value="Semanal">Semanal</option>
+            </select>
+
+            <label>TIPO DE CREDITO</label>
+            <input type="text" id="credit-type" placeholder="Tipo de crédito" readonly>
+
+            <label>VALOR CREDITO</label>
+            <input type="text" id="credit-value" placeholder="Valor crédito" inputmode="numeric">
+
+            <label>INTERESES</label>
+            <input type="text" id="credit-interest" placeholder="Intereses" inputmode="numeric">
+
+            <div id="total-credit-text" style="margin: 15px 0; font-weight: bold; color: #333; text-align: center;">VALOR TOTAL CREDITO: $0</div>
+
+            <label>CUOTAS</label>
+            <input type="number" id="credit-installments" placeholder="Cuotas" inputmode="numeric">
+
+            <label>VALOR CUOTA</label>
+            <input type="text" id="credit-installment-value" placeholder="Valor cuota" readonly>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button id="btn-register-credit" onclick="registerCredit()">REGISTRAR CREDITO</button>
+                <button id="btn-search-client" style="background-color: #6c757d;" onclick="openSearchModal()">BUSCAR OTRO CLIENTE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Busqueda Cliente -->
+    <div id="search-client-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+                <span class="screen-title">BUSQUEDA DE CLIENTE</span>
+            </div>
+            <div class="modal-body">
+                <div class="radio-group">
+                    <label><input type="radio" name="searchType" value="cedula" checked> CEDULA</label>
+                    <label><input type="radio" name="searchType" value="nombre"> NOMBRE</label>
+                </div>
+                <input type="text" id="modal-search-input" placeholder="Ingrese cédula">
+                <button onclick="searchClient()">BUSCAR</button>
+                <div id="client-list-results" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cliente No Elegible -->
+    <div id="ineligible-client-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header" style="background-color: #dc3545;">
+                <span class="screen-title">Cliente no elegible</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 15px;">El cliente supera el limite de endeudamiento para nuevos creditos.</p>
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Deuda actual</label>
+                <input type="text" id="ineligible-debt-amount" readonly style="text-align: center; font-weight: bold; color: #dc3545; font-size: 1.2rem;">
+                <button id="btn-ineligible-ok" style="background-color: #6c757d;">ACEPTAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cliente Cerrado -->
+    <div id="closed-client-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header" style="background-color: #dc3545;">
+                <span class="screen-title">Cliente cerrado</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 15px;">Este cliente ha cerrado su credito. Contacte al administrador para mas informacion.</p>
+                <button id="btn-closed-client-ok" style="background-color: #6c757d;">ACEPTAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla Ver Deudores -->
+    <div id="ver-deudores-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">LISTADO DE DEUDORES</span>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                <button id="btn-load-more-debtors" class="hidden" style="background: transparent; border: 1px solid white; color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap;">VER MÁS</button>
+                <button id="btn-refresh-debtors" style="background: none; border: none; color: white; font-size: 1.5rem; padding: 0; margin: 0; width: auto; cursor: pointer;" onclick="loadDebtors(true)">&#8635;</button>
+                <img src="img/logo.png" style="height: 24px; width: auto;">
+            </div>
+        </div>
+        <div class="form-content">
+            <label>COBRO REALIZADO</label>
+            <input type="text" id="cobro-realizado" placeholder="Sin calcular" readonly>
+
+            <select id="filter-dept" class="hidden">
+                <option value="" disabled selected>Seleccione un departamento</option>
+            </select>
+
+            <select id="filter-1" onchange="loadDebtors()">
+                <option value="" disabled selected>Sin municipio seleccionado</option>
+            </select>
+            <select id="filter-asesor" class="hidden" onchange="loadDebtors()">
+                <option value="" disabled selected>Seleccione un asesor</option>
+            </select>
+            <select id="filter-2" onchange="loadDebtors()">
+                <option value="">SELECCIONE TIPO DE PAGO</option>
+                <option value="Diario">Diario</option>
+                <option value="Semanal">Semanal</option>
+            </select>
+            <input type="text" id="search-debtor" placeholder="NOMBRE" oninput="loadDebtors()">
+        </div>
+        <div id="debtors-list-wrapper">
+            <div class="table-header" style="position: sticky; top: 0; z-index: 1;">
+                <div>Cliente</div>
+                <div>Estado</div>
+                <div>Cuota</div>
+                <div>Saldo</div>
+                <div>Municipio</div>
+            </div>
+            <div id="debtors-list-container"></div>
+        </div>
+    </div>
+
+    <!-- Modal Detalles Credito -->
+    <div id="details-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto;">
+            <div class="modal-header">
+                <span class="screen-title">Detalles</span>
+                <button class="back-btn-icon" onclick="closeDetailsModal()" style="margin:0; margin-left:auto; font-size: 2rem; line-height: 1rem;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-bottom: 100px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                    <strong>Estado:</strong>
+                    <div id="detail-status-square" style="width: 20px; height: 20px; background-color: grey; border: 1px solid #999;"></div>
+                </div>
+                <p style="margin: 10px 0;"><strong>Fecha de prestamo:</strong> <span id="detail-loan-date"></span></p>
+                <p style="margin: 10px 0;"><strong>Dia de Prestamo:</strong> <span id="detail-loan-day"></span></p>
+                <p style="margin: 10px 0;"><strong>Fecha de vencimiento:</strong> <span id="detail-due-date"></span></p>
+                <p style="margin: 10px 0;"><strong>Cuotas Restantes:</strong> <span id="detail-remaining"></span></p>
+                
+                <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+                
+                <p style="margin: 10px 0;"><strong>Fecha Ultimo Pago:</strong> <span id="detail-last-pay-date">Cargando...</span></p>
+                <p style="margin: 10px 0;"><strong>Dia Ultimo Pago:</strong> <span id="detail-last-pay-day">...</span></p>
+                <p style="margin: 10px 0;"><strong>Monto Ultimo Pago:</strong> <span id="detail-last-pay-amount">...</span></p>
+
+                <div style="position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+                    <button id="btn-detail-pay" style="margin:0; width: auto; padding: 8px 20px;">PAGO</button>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div id="detail-status-icon"></div>
+                        <button id="btn-detail-history" style="margin:0; width: auto; padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Historial de Pagos -->
+    <div id="payment-history-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="screen-title">Historial de pagos</span>
+                <button class="back-btn-icon" onclick="document.getElementById('payment-history-modal').classList.add('hidden')" style="margin:0; margin-left:auto; font-size: 2rem; line-height: 1rem;">&times;</button>
+            </div>
+            <div class="modal-body" id="history-list-container"></div>
+        </div>
+    </div>
+
+    <!-- Pantalla Registrar Pago -->
+    <div id="registrar-pago-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="returnToDebtors()">&#8592;</button>
+            <span class="screen-title">REGISTRAR PAGO</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content">
+            <label>CLIENTE</label>
+            <input type="text" id="pay-client" readonly>
+
+            <label id="pay-asesor-lbl" class="hidden">ASESOR</label>
+            <input type="text" id="pay-asesor" readonly class="hidden">
+
+            <label>CEDULA</label>
+            <input type="number" id="pay-cedula" placeholder="Cédula">
+
+            <label>TELEFONO</label>
+            <input type="tel" id="pay-phone" placeholder="Teléfono">
+
+            <label>DIRECCION</label>
+            <input type="text" id="pay-address" placeholder="Dirección">
+
+            <label>DEUDA ACTUAL</label>
+            <input type="text" id="pay-balance" readonly>
+
+            <label>FECHA DE ABONO</label>
+            <input type="text" id="pay-date" readonly>
+
+            <label>CUOTAS RESTANTES</label>
+            <input type="text" id="pay-remaining" readonly>
+
+            <label>METODO DE PAGO</label>
+            <select id="pay-method">
+                <option value="Efectivo" selected>Efectivo</option>
+                <option value="Transferencia">Transferencia</option>
+            </select>
+
+            <label>VALOR ABONO</label>
+            <input type="text" id="pay-amount" placeholder="$ 0" inputmode="numeric">
+
+            <button id="btn-submit-payment" onclick="registerPayment()">REGISTRAR PAGO</button>
+        </div>
+    </div>
+
+    <!-- Gastos Diarios (Pantalla completa) -->
+    <div id="gastos-diarios-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">GASTOS DIARIOS</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div id="gastos-admin-fields" class="hidden">
+                <label>USUARIO</label>
+                <select id="gastos-user-select"><option value="" disabled selected>Seleccione un usuario</option></select>
+                <label>CEDULA</label>
+                <input type="text" id="gastos-user-cedula" readonly>
+                <label>DIA DEL GASTO</label>
+                <input type="date" id="gastos-admin-date">
+            </div>
+
+            <label>GASOLINA</label>
+            <input type="text" id="expense-gasolina" placeholder="$ 0" inputmode="numeric">
+
+            <label>ALMUERZO</label>
+            <input type="text" id="expense-almuerzo" placeholder="$ 0" inputmode="numeric">
+
+            <label>OTROS</label>
+            <input type="text" id="expense-otros" placeholder="$ 0" inputmode="numeric">
+
+            <label>OBSERVACIONES OTROS</label>
+            <input type="text" id="expense-obs" placeholder="Descripción">
+
+            <label>TOTAL GASTOS DIARIOS</label>
+            <input type="text" id="expense-total" placeholder="$ 0" readonly>
+
+            <button id="btn-register-daily-expense" onclick="registerDailyExpense()">REGISTRAR GASTOS</button>
+        </div>
+    </div>
+
+    <!-- Gastos Semanales (Pantalla completa) -->
+    <div id="gastos-semanales-section" class="hidden full-screen-view">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">GASTOS SEMANALES</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div id="wgastos-admin-fields" class="hidden">
+                <label>USUARIO</label>
+                <select id="wgastos-user-select"><option value="" disabled selected>Seleccione un usuario</option></select>
+                <label>CEDULA</label>
+                <input type="text" id="wgastos-user-cedula" readonly>
+                <label>DOMINGO DEL GASTO</label>
+                <input type="date" id="wgastos-admin-date">
+            </div>
+
+            <label>ALMUERZO DE LA SEMANA</label>
+            <input type="text" id="wexpense-almuerzo" placeholder="$ 0" inputmode="numeric">
+
+            <label>GASOLINA DE LA SEMANA</label>
+            <input type="text" id="wexpense-gasolina" placeholder="$ 0" inputmode="numeric">
+
+            <label>OTROS GASTOS DE LA SEMANA</label>
+            <input type="text" id="wexpense-otros" placeholder="$ 0" inputmode="numeric">
+
+            <label>OBSERVACIONES OTROS GASTOS DE LA SEMANA</label>
+            <input type="text" id="wexpense-obs" placeholder="Descripción">
+
+            <label>TOTAL GASTOS DE LA SEMANA</label>
+            <input type="text" id="wexpense-total" placeholder="$ 0" readonly>
+
+            <button id="btn-register-weekly-expense" onclick="registerWeeklyExpense()">REGISTRAR GASTOS SEMANALES</button>
+        </div>
+    </div>
+
+    <!-- Modal Tipo de Gastos -->
+    <div id="gastos-type-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 300px;">
+            <div class="modal-header">
+                <button class="back-btn-icon" onclick="document.getElementById('gastos-type-modal').classList.add('hidden')" style="margin:0; margin-right: 15px;">&#8592;</button>
+                <span class="screen-title" style="font-size: 14px; white-space: nowrap;">ELIJA EL TIPO DE GASTOS</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px; padding: 20px;">
+                <button id="btn-gastos-diario" onclick="showDailyExpensesScreen()">DIARIO</button>
+                <button id="btn-gastos-semanal" onclick="showWeeklyExpensesScreen()">SEMANAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tipo de Reporte -->
+    <div id="reportes-type-modal" class="modal-overlay hidden" style="touch-action: pan-x pan-y;">
+        <div class="modal-content" style="min-height: auto; max-width: 300px;">
+            <div class="modal-header">
+                <button class="back-btn-icon" id="btn-close-reportes-type" style="margin:0; margin-right: 15px;">&#8592;</button>
+                <span class="screen-title" style="font-size: 14px; white-space: nowrap;">SELECCIONE TIPO DE REPORTE</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px; padding: 20px;">
+                <button id="btn-reporte-diario">DIARIO</button>
+                <button id="btn-reporte-semanal">SEMANAL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporte Diario (Pantalla completa) -->
+    <div id="reporte-diario-section" class="hidden full-screen-view" style="touch-action: pan-x pan-y;">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">CIERRE DIARIO</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div id="report-daily-admin-fields" class="hidden">
+                <label>USUARIO</label>
+                <select id="report-daily-user-select"><option value="" disabled selected>Seleccione un usuario</option></select>
+                <label>DIA DEL REPORTE</label>
+                <input type="date" id="report-daily-admin-date">
+            </div>
+
+            <label>CREDITOS DE HOY</label>
+            <input type="text" id="report-daily-credits" placeholder="$ 0" readonly>
+
+            <label>COBROS DE HOY</label>
+            <input type="text" id="report-daily-collections" placeholder="$ 0" readonly>
+            
+            <div style="text-align: center; margin: 15px 0; color: #333; font-weight: bold;">
+                <div id="report-daily-cash-text">Efectivo:</div>
+                <div id="report-daily-transfer-text">Transferencia:</div>
+            </div>
+
+            <label>GASTOS DEL DIA</label>
+            <input type="text" id="report-daily-expenses" placeholder="$ 0" readonly>
+
+            <label>BASE INICIAL</label>
+            <input type="text" id="report-daily-base-initial" placeholder="$ 0" readonly>
+
+            <label>BASE FINAL</label>
+            <input type="text" id="report-daily-base-final" placeholder="$ 0" readonly>
+
+            <button id="btn-register-daily-report" onclick="registerDailyReport()">REGISTRAR REPORTE DE HOY</button>
+        </div>
+    </div>
+
+    <!-- Reporte Semanal (Pantalla completa) -->
+    <div id="reporte-semanal-section" class="hidden full-screen-view" style="touch-action: pan-x pan-y;">
+        <div class="top-bar">
+            <button class="back-btn-icon" onclick="showHomeScreen()">&#8592;</button>
+            <span class="screen-title">CIERRE SEMANAL</span>
+            <img src="img/logo.png" class="top-bar-logo">
+        </div>
+        <div class="form-content" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div id="report-weekly-admin-fields" class="hidden">
+                <label>USUARIO</label>
+                <select id="report-weekly-user-select"><option value="" disabled selected>Seleccione un usuario</option></select>
+                <label>DOMINGO DEL REPORTE</label>
+                <input type="date" id="report-weekly-admin-date">
+            </div>
+
+            <label>CREDITOS DE LA SEMANA</label>
+            <input type="text" id="report-weekly-credits" placeholder="$ 0" readonly>
+
+            <label>COBROS DE LA SEMANA</label>
+            <input type="text" id="report-weekly-collections" placeholder="$ 0" readonly>
+            
+            <div style="text-align: center; margin: 15px 0; color: #333; font-weight: bold;">
+                <div id="report-weekly-cash-text">Efectivo:</div>
+                <div id="report-weekly-transfer-text">Transferencia:</div>
+            </div>
+
+            <label>GASTOS DE LA SEMANA</label>
+            <input type="text" id="report-weekly-expenses" placeholder="$ 0" readonly>
+
+            <label>BASE INICIAL SEMANAL</label>
+            <input type="text" id="report-weekly-base-initial" placeholder="$ 0" readonly>
+
+            <label>BASE FINAL SEMANAL</label>
+            <input type="text" id="report-weekly-base-final" placeholder="$ 0" readonly>
+
+            <button id="btn-register-weekly-report" onclick="registerWeeklyReport()">REGISTRAR REPORTE SEMANAL</button>
+        </div>
+    </div>
+
+    <!-- Modal Decisión Represte/Cerrar -->
+    <div id="represte-decision-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header">
+                <span class="screen-title">¿Que desea hacer el cliente?</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 20px;">El cliente tiene una deuda considerable y pocas cuotas.</p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="btn-decision-close-card" style="background-color: #1f2c44;">Cerrar tarjeta</button>
+                    <button id="btn-decision-represte" style="background-color: #1f2c44;">Represte</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Contacto Admin Represte -->
+    <div id="admin-contact-represte-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header">
+                <span class="screen-title">Contacte al administrador</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 20px;">Se ha enviado una solicitud de aprobacion para el represte</p>
+                <button id="btn-admin-represte-ok">ACEPTAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Timeout Decisión -->
+    <div id="timeout-decision-modal" class="modal-overlay hidden" style="z-index: 10001;">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header">
+                <span class="screen-title">Cerrar peticion de aprobacion de pago</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                    <button id="btn-timeout-close" style="background-color: #dc3545;">Cerrar</button>
+                    <button id="btn-timeout-wait" style="background-color: #007bff;">Esperar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Esperando Respuesta Represte -->
+    <div id="represte-waiting-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header">
+                <span class="screen-title">Solicitud Pendiente</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 20px;">Esperando respuesta del administrador</p>
+                <button onclick="document.getElementById('represte-waiting-modal').classList.add('hidden')">ACEPTAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Alerta Segundo Pago -->
+    <div id="second-payment-warning-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header" style="background-color: #ffc107; color: #333;">
+                <span class="screen-title">Aviso de Pago Adicional</span>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size: 1rem; color: #333; margin-bottom: 20px;">Este cliente ya tiene una cuota registrada el dia actual (o semana actual). Por favor contacte con administrador para mas informacion.</p>
+                <button id="btn-confirm-second-payment-request" style="background-color: #333;">ACEPTAR</button>
+                <button onclick="document.getElementById('second-payment-warning-modal').classList.add('hidden')" style="background-color: #dc3545; margin-top: 10px;">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Registrar Link (Conexión) -->
+    <div id="register-link-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="min-height: auto; max-width: 350px;">
+            <div class="modal-header">
+                <span class="screen-title">REGISTRAR LINK</span>
+                <button class="back-btn-icon" onclick="document.getElementById('register-link-modal').classList.add('hidden')" style="margin:0; margin-left:auto; font-size: 2rem; line-height: 1rem;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>NOMBRE DEL LINK</label>
+                <input type="text" id="link-name-input" readonly>
+                <label>LINK</label>
+                <input type="text" id="link-url-input" placeholder="https://ejemplo.com">
+                <button onclick="saveConnectionLink()">GUARDAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de Carga Aprobación -->
+    <div id="approval-loading-screen" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f0f2f5; z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <div style="border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #1f2c44; animation: spin 1s linear infinite; margin-bottom: 10px;"></div>
+        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        <div style="color: #555; font-weight: bold; font-size: 1.1rem;">Esperando la aprobacion del administrador...</div>
+    </div>
+
+    <!-- Spinner/Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+</body>
+</html>
